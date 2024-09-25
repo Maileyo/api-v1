@@ -20,4 +20,7 @@ def handle_server_error(message: str = "Server Error"):
 def handle_inv_token_error(message: str = "Invalid Token"):
     raise APIException(message, status_code=403)
 
+def handle_custom_error(message: str,status_code):
+    raise APIException(message, status_code)
+
 

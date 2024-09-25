@@ -149,11 +149,22 @@ async def getCookies(request: Request):
     except Exception as e:
         # Handle any unknown error with a generic server error response
         return error_response(message="An unexpected error occurred", status_code=500)
-    
+
     
     
 @router.post("/api/v1/signIn")
 async def signIn(request: Request):
+    try:
+        user =  signInController(request)
+        return success_response(user)
+
+    except APIException as e:
+        # Catch custom API exceptions and return error response
+        return error_response(message=e.detail, status_code=e.status_code)
+    
+    except Exception as e:
+        # Handle any unknown error with a generic server error response
+        return error_response(message="An unexpected error occurred", status_code=500)
     # get the user from the request
     # check if the user is already present in the db
     # if not present then create the user in db
