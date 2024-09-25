@@ -7,12 +7,19 @@ from app.model.user import User
 from bson import ObjectId
 import os
 import datetime
+from googleapiclient.errors import HttpError
+from app.config import MSFT_CLIENT_ID, MSFT_CLIENT_SECRET, MSFT_REDIRECT_URI,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
 
 # Set up the Google OAuth client details
-GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+# GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+# GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 REDIRECT_URI = 'http://localhost:8000/callback'
 
+
+# Microsoft OAuth client details
+
+
+print(GOOGLE_CLIENT_SECRET)
 # Google OAuth Flow Setup
 def get_google_flow():
     try:
@@ -26,7 +33,12 @@ def get_google_flow():
                     "token_uri": "https://oauth2.googleapis.com/token"
                 }
             },
-            scopes="https://mail.google.com/"
+            scopes=[
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+                "openid",
+                "https://mail.google.com/"
+            ]
         )
         flow.redirect_uri = REDIRECT_URI
         return flow
@@ -62,24 +74,33 @@ def generate_google_login_url():
 
 # Handle the callback and exchange code for tokens
 async def handle_google_callback(code: str):
-    flow = get_google_flow()
-    flow.fetch_token(code=code)
+    try:
+        flow = get_google_flow()
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
 
-    credentials = flow.credentials
-    access_token = credentials.token
-    refresh_token = credentials.refresh_token
-    expiry = credentials.expiry.timestamp()
 
-    service = build('oauth2', 'v2', credentials=credentials)
-    user_info = service.userinfo().get().execute()
-    
-    return {
-        "email": user_info["email"],
-        "name": user_info["name"],
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_expiry": expiry
-    }
+        if not credentials.token:
+            raise HTTPException(status_code=401, detail="Failed to fetch access token")
+        print(f"Token: {credentials.token}, Refresh Token: {credentials.refresh_token}, Expiry: {credentials.expiry}")
+
+        service = build('oauth2', 'v2', credentials=credentials)
+        user_info = service.userinfo().get().execute()
+
+        return {
+            "email": user_info["email"],
+            "name": user_info["name"],
+            "access_token": credentials.token,
+            "refresh_token": credentials.refresh_token,
+            "token_expiry": credentials.expiry.timestamp() if credentials.expiry else None
+        }
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        raise HTTPException(status_code=401, detail="Failed to authenticate with Google")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
 
 # Refresh the access token if expired
 async def refresh_access_token(email: str, refresh_token: str):
@@ -91,3 +112,50 @@ async def refresh_access_token(email: str, refresh_token: str):
 
     await update_user_tokens(email, new_access_token, refresh_token, expiry)
     return new_access_token
+
+
+
+# msft login 
+def generateMsftLoginUrl():
+    client_id= MSFT_CLIENT_ID
+    redirect_uri= MSFT_REDIRECT_URI
+    scope="https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.Send offline_access"
+    auth_url = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
+    query_params = {
+    'client_id': client_id,
+    'response_type': 'code',
+    'redirect_uri': redirect_uri,
+    'response_mode': 'query',
+    'scope': scope,
+     }
+    authorization_url = f"{auth_url}?{urllib.parse.urlencode(query_params)}"
+    
+    
+    
+async def handle_msft_callback(code: str):
+    try:
+        code=code
+        token_url = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+
+        token_data = {
+                'client_id': MSFT_CLIENT_ID,
+                'scope': 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.Send offline_access',
+                'code': code,
+                'redirect_uri': MSFT_REDIRECT_URI,
+                'grant_type': 'authorization_code',
+                'client_secret': MSFT_CLIENT_SECRET,
+            }
+
+        response = requests.post(token_url, data=token_data)
+        tokens = response.json()
+
+        return {
+            "email": "pranjal@gmail.com",
+            "name": "pranjal",
+            "access_token": tokens.access_token,
+            "refresh_token": tokens.refresh_token,
+            "token_expiry": tokens.expires_in.timestamp() if credentials.expiry else None
+        }
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")

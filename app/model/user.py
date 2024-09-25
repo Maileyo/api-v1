@@ -1,9 +1,17 @@
 from pydantic import BaseModel
-
-class User(BaseModel):
-    email: str
-    name: str
+from typing import List, Dict
+class Auth(BaseModel):
+    expiry: float
     access_token: str
     refresh_token: str
-    session_id: str
-    token_expiry: int  # Timestamp to track access token expiry
+
+class EmailAccount(BaseModel):
+    email_id: str
+    provider: str
+    auth: Auth
+
+class User(BaseModel):
+    userId: str
+    name: str
+    avatar: str
+    email_account: List[EmailAccount]
