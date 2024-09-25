@@ -1,4 +1,4 @@
-# from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi import APIRouter, Request, Response
 # from app.service.auth.auth_service import (
 #     generate_google_login_url,
 #     handle_google_callback,
@@ -10,7 +10,7 @@
 # from app.core.sessions import set_session_cookie, get_session_cookie, clear_session_cookie, create_session_id
 # from app.model.user import User
 
-# router = APIRouter()
+router = APIRouter()
 
 # # Google auth 
 
@@ -72,11 +72,6 @@
 #     new_access_token = await refresh_access_token(user['email'], user['refresh_token'])
 #     return {"access_token": new_access_token}
 
-# @router.get("/logout")
-# async def logout(response: Response):
-#     # Clear the session cookie
-#     clear_session_cookie(response)
-#     return {"message": "Logged out successfully"}
 
 
 # msft auth
@@ -130,32 +125,32 @@
 
 
 
-from app.controller.auth_controller import getCookiesController
-from app.utils.response import success_response, error_response
+from app.controller.auth_controller import signInController , signUpController , getUserController
+from app.utils.apiResponse import success_response, error_response
 from app.utils.error import handle_unauthenticated_error
 from app.utils.token import verify_access_token
 from app.utils.database import users_collection
 
-@router.get("/api/v1/getCookies")
-async def getCookies(request: Request):
-    try:
-        user = await getCookiesController(request)
-        return success_response(user)
-    
-    except APIException as e:
-        # Catch custom API exceptions and return error response
-        return error_response(message=e.detail, status_code=e.status_code)
-    
-    except Exception as e:
-        # Handle any unknown error with a generic server error response
-        return error_response(message="An unexpected error occurred", status_code=500)
-
-    
-    
-@router.post("/api/v1/signIn")
+@router.get("/api/v1/signIn")
 async def signIn(request: Request):
     try:
-        user =  signInController(request)
+        user = await signInController(request)
+        return success_response(user)
+    
+    except APIException as e:
+        # Catch custom API exceptions and return error response
+        return error_response(message=e.detail, status_code=e.status_code)
+    
+    except Exception as e:
+        # Handle any unknown error with a generic server error response
+        return error_response(message="An unexpected error occurred", status_code=500)
+
+    
+    
+@router.post("/api/v1/signUp")
+async def signUp(request: Request,response:Response):
+    try:
+        user =  signUpController(request)
         return success_response(user)
 
     except APIException as e:
@@ -165,20 +160,27 @@ async def signIn(request: Request):
     except Exception as e:
         # Handle any unknown error with a generic server error response
         return error_response(message="An unexpected error occurred", status_code=500)
-    # get the user from the request
-    # check if the user is already present in the db
-    # if not present then create the user in db
-    # run authenticaion callback based on provider 
-    # Create a jwt token and set in the cookie
-    # return authenticated
-    pass
+
 
 @router.get("/api/v1/get_user")
 async def getUser(request: Request):
-    # get the user from the request
-    # check if the user is already present in the db
-    # if not present then create the user in db
-    # run authenticaion callback based on provider 
-    # Create a jwt token and set in the cookie
-    # return authenticated
-    pass
+    try:
+        user = await getUserController(request)
+        return success_response(user)
+        
+    except APIException as e:
+        # Catch custom API exceptions and return error response
+        return error_response(message=e.detail, status_code=e.status_code)
+    
+    except Exception as e:
+        # Handle any unknown error with a generic server error response
+        return error_response(message="An unexpected error occurred", status_code=500)
+
+
+@router.get("/api/v1/logout")
+async def logout(response: Response):
+    try:
+        clear_session_cookie(response)
+        return success_response("logged out successfully")
+    except Exception as e:
+        return error_response(f"error while logging out {e}",status_code=422)
