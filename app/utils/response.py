@@ -1,4 +1,4 @@
-from fastapi.responses import JSONResponse
+from fastapi import JSONResponse
 
 def success_response(data: dict, message: str = "Success", status_code: int = 200):
     return JSONResponse(

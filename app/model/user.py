@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from typing import List, Dict
+from datetime import datetime
 class Auth(BaseModel):
-    expiry: float
+    expiry: datetime
     access_token: str
     refresh_token: str
 

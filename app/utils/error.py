@@ -24,3 +24,4 @@ def handle_custom_error(message: str,status_code):
     raise APIException(message, status_code)
 
 
+
