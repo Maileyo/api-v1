@@ -11,6 +11,9 @@ from googleapiclient.errors import HttpError
 from app.config import MSFT_CLIENT_ID, MSFT_CLIENT_SECRET, MSFT_REDIRECT_URI,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GOOGLE_REDIRECT_URI
 import requests
 import urllib.parse
+from app.utils.error import handle_unauthenticated_error,handle_custom_error,handle_validation_error,handle_server_error,handle_not_found_error
+from app.utils.database import users_collection
+
 
 def get_google_flow():
     try:
@@ -44,80 +47,99 @@ def generate_google_login_url():
     return auth_url
 
 
-
-from app.utils.error import handle_unauthenticated_error,handle_custom_error,handle_validation_error,handle_server_error,handle_not_found_error
-from app.utils.database import users_collection
-
+# Refresh the access token for the given email account              
 async def refresh_token(email_acc: []):
-        print("email_dict", len(email_acc))
-        for  email in email_acc:
-            
-            if email['provider'] == 'google':
-                print("google")
-                payload = {
-                            'client_id': GOOGLE_CLIENT_ID,
-                            'client_secret': GOOGLE_CLIENT_SECRET,
-                            'refresh_token': email['refresh_token'],
-                            'grant_type': 'refresh_token'
-                        }
-                 
-                try:
-                     response = requests.post("https://oauth2.googleapis.com/token", data=payload)
-                     token_info = response.json()
-                     access_token = token_info['access_token']
-                    #  print(token_info)
-                except Exception as e:
-                     handle_custom_error(message=str(e),status_code=400)
+    print("email_dict", len(email_acc))
+    
+    refresh_results = []  # Collect results to return at the end
 
-                new_access_token = access_token
-                expiry =  datetime.utcnow() + timedelta(seconds=3600)
-                
-                user_google = await users_collection.find_one({"userId": email['userId']})
-                # print("user_google", user_google)
-                print("new access token ----------->", new_access_token)
-                for email_account in user_google["email_account"]:
+    for email in email_acc:
+        result = {
+            'emailId': email['emailId'],
+            'provider': email['provider'],
+            'status': 'failed',  # Default status
+            'new_access_token': None
+        }
+        
+        if email['provider'] == 'google':
+            print("Refreshing Google token...")
+            payload = {
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': GOOGLE_CLIENT_SECRET,
+                'refresh_token': email['refresh_token'],  # Ensure refresh_token is used
+                'grant_type': 'refresh_token'
+            }
+            try:
+                response = requests.post("https://oauth2.googleapis.com/token", data=payload)
+                token_info = response.json()
+                if 'access_token' in token_info:
+                    access_token = token_info['access_token']
+                    expiry = datetime.utcnow() + timedelta(seconds=token_info.get('expires_in', 3600))
+                    
+                    user_google = await users_collection.find_one({"userId": email['userId']})
+                    print("New access token:", access_token)
+                    
+                    # Update the user's token info
+                    for email_account in user_google["email_account"]:
                         if email_account["email_id"] == email['emailId']:
-                            print("old access token ----------->", email_account["auth"]["access_token"])
-                            email_account["auth"]["access_token"] = new_access_token
+                            print("Old access token:", email_account["auth"]["access_token"])
+                            email_account["auth"]["access_token"] = access_token
                             email_account["auth"]["expiry"] = expiry
                             await users_collection.update_one(
-                                                        {"userId": email['userId']},
-                                                        {"$set": {"email_account": user_google["email_account"]}}
-                                                )
-                            # return new_access_token
-            
-            elif email['provider'] == 'msft':
-                print("msft")
-                payload = {
-                            'client_id': MSFT_CLIENT_ID,
-                            'client_secret': MSFT_CLIENT_SECRET,
-                            'refresh_token': email['refresh_token'],
-                            'grant_type': 'refresh_token'
-                        }
-                try:
-                        response = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data=payload)
-                        token_info = response.json()
-                        # print(token_info)
-                        access_token = token_info['access_token']
-                except Exception as e:
-                    handle_custom_error(message=str(e),status_code=400)
-                new_access_token = access_token
-                print("new access token ----------->", new_access_token)
-                expiry =  datetime.utcnow() + timedelta(seconds=3600)
-                user_msft = await users_collection.find_one({"userId": email['userId']})
-                for email_account in user_msft["email_account"]:
+                                {"userId": email['userId']},
+                                {"$set": {"email_account": user_google["email_account"]}}
+                            )
+                            result['status'] = 'success'
+                            result['new_access_token'] = access_token
+                else:
+                    print("Failed to refresh Google token:", token_info)
+                    result['error'] = token_info.get('error', 'Unknown error')
+
+            except Exception as e:
+                print(f"Error refreshing Google token: {str(e)}")
+                result['error'] = str(e)
+
+        elif email['provider'] == 'msft':
+            print("Refreshing Microsoft token...")
+            payload = {
+                'client_id': MSFT_CLIENT_ID,
+                'client_secret': MSFT_CLIENT_SECRET,
+                'refresh_token': email['refresh_token'],
+                'grant_type': 'refresh_token'
+            }
+            try:
+                response = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data=payload)
+                token_info = response.json()
+                if 'access_token' in token_info:
+                    access_token = token_info['access_token']
+                    expiry = datetime.utcnow() + timedelta(seconds=token_info.get('expires_in', 3600))
+                    
+                    user_msft = await users_collection.find_one({"userId": email['userId']})
+                    print("New access token:", access_token)
+                    
+                    # Update the user's token info
+                    for email_account in user_msft["email_account"]:
                         if email_account["email_id"] == email['emailId']:
-                            print("old access token ----------->", email_account["auth"]["access_token"])
-                            email_account["auth"]["access_token"] = new_access_token
+                            print("Old access token:", email_account["auth"]["access_token"])
+                            email_account["auth"]["access_token"] = access_token
                             email_account["auth"]["expiry"] = expiry
                             await users_collection.update_one(
-                                                        {"userId": email['userId']},
-                                                        {"$set": {"email_account": user_msft["email_account"]}}
-                                                )
-                            # return new_access_token
-        return
-                
-                
+                                {"userId": email['userId']},
+                                {"$set": {"email_account": user_msft["email_account"]}}
+                            )
+                            result['status'] = 'success'
+                            result['new_access_token'] = access_token
+                else:
+                    print("Failed to refresh Microsoft token:", token_info)
+                    result['error'] = token_info.get('error', 'Unknown error')
+
+            except Exception as e:
+                print(f"Error refreshing Microsoft token: {str(e)}")
+                result['error'] = str(e)
+
+        refresh_results.append(result)
+
+    return refresh_results
                 
 
 

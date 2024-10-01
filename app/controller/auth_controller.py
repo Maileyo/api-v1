@@ -39,14 +39,17 @@ async def getCookiesController(request):
                 "refresh_token": email_account['auth']['refresh_token']
             })
             
+    token_status = await refresh_token(email_acc)
             # Call refresh_token for each email account that requires a refresh
+    print("token_status",token_status)
     len(email_acc)      
-    await refresh_token(email_acc)
+   
     
     return {
         "userId": user['userId'],
         "name": user['name'],
-        "avatar": user['avatar']
+        "avatar": user['avatar'],
+        "token_status": token_status
     }
 
 
@@ -58,13 +61,37 @@ async def signInController(request_body, response):
     user = await users_collection.find_one({"userId": userId})
     if not user:
         return handle_custom_error("user not found", 404) 
-    #TODO Refresh access token func call   
+    
+    
+    email_acc = []
+    len(email_acc)   
+    for email_account in user['email_account']:
+        print("loop1")
+        expiry_value = email_account['auth']['expiry']
+        provider = email_account['provider']
+        current_time = datetime.utcnow()
+        
+        # Check if the token is still valid
+        if current_time > expiry_value:
+            email_acc.append({
+                "userId": userId,
+                "emailId": email_account['email_id'],
+                "provider": email_account['provider'],
+                "refresh_token": email_account['auth']['refresh_token']
+            })
+            
+    token_status = await refresh_token(email_acc)
+            # Call refresh_token for each email account that requires a refresh
+    print("token_status",token_status)
+    len(email_acc)      
+   
     jwt_access_token = create_access_token(data={"sub": user['userId']})
     set_session_cookie(response, jwt_access_token)
     return {
         "userId": user['userId'],
         "name": user['name'],
         "avatar": user['avatar'],
+        "token_status": token_status
     }
 
 

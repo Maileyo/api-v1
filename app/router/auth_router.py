@@ -52,6 +52,7 @@ async def cookies(request: Request):
         return error_response(message="Server error", status_code=500)
 
 
+
 @router.post("/api/v1/url-generate")
 async def urlGenerate(authProvider:List[str], request: Request, response: Response):
     try:
@@ -90,6 +91,8 @@ async def createAccount(sign_up_request: SignUpRequest, request: Request, respon
         logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
         return error_response(message="Server error", status_code=500)
     
+    
+    
 @router.post("/api/v1/signIn")
 async def signIn(sign_in_request: SignInRequest, request: Request, response: Response):
     try:
@@ -124,6 +127,7 @@ async def msft_callback(request:Request, response: Response, code: str):
         logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
         return error_response(message="Server error", status_code=500)
 
+#### TODO see for refresh of the refresh token and login authentication flow and add Auth0 to FE TODO ####
 
 
 @router.get("/auth/callback")
