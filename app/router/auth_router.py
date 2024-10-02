@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Request, Response, HTTPException,FastAPI
+from fastapi import APIRouter, Request, Response, HTTPException
 from pydantic import BaseModel
-from app.controller.auth_controller import signInController,CreateAccountController , getCookiesController, signUpController , getUserController
+from app.controller.auth_controller import signInController,CreateAccountController , getCookiesController, signUpController , getUserController,checkUserController
 from app.utils.apiResponse import success_response, error_response
 from app.utils.error import handle_unauthenticated_error
 from app.utils.token import verify_access_token
@@ -11,23 +11,12 @@ from app.utils.session import clear_session_cookie
 from fastapi.responses import RedirectResponse
 from app.service.auth.auth_service import  generate_google_login_url,generate_msft_login_url
 from typing import List
-from fastapi.middleware.cors import CORSMiddleware
+
 
 
 router = APIRouter()
-app = FastAPI()
 
-origins = [
-   "*"
-]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class SignUpRequest(BaseModel):
     userId: str
@@ -35,6 +24,9 @@ class SignUpRequest(BaseModel):
 
 class SignInRequest(BaseModel):
     userId: str
+
+class AuthProviderRequest(BaseModel):
+    authProvider: List[str]
 
 
 
@@ -54,24 +46,24 @@ async def cookies(request: Request):
 
 
 @router.post("/api/v1/url-generate")
-async def urlGenerate(authProvider:List[str], request: Request, response: Response):
+async def urlGenerate(request_data: AuthProviderRequest, request: Request, response: Response):
     try:
-        # print(user_data)
-            redirect_url = []
-            for provider in authProvider:
-                if provider=="google":
-                    redirect_url.append(generate_google_login_url())
-                else:
-                    redirect_url.append(generate_msft_login_url())
-            return success_response(message="generated url",status_code=200,data=redirect_url)
-            # for url in redirect_url:
-            #     return RedirectResponse(url=url)
+        authProvider = request_data.authProvider
+        redirect_urls = []
+
+        for provider in authProvider:
+            if provider == "google":
+                redirect_urls.append(generate_google_login_url())
+            elif provider == "msft":
+                redirect_urls.append(generate_msft_login_url())
+        
+        return success_response(message="Generated URLs", status_code=200, data=redirect_urls)
+
     except HTTPException as he:
         return error_response(message=he.detail, status_code=he.status_code)
     except Exception as e:
-        logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
+        logging.error(f"Unexpected error in urlGenerate: {str(e)}", exc_info=True)
         return error_response(message="Server error", status_code=500)
-
 
 
 
@@ -127,8 +119,6 @@ async def msft_callback(request:Request, response: Response, code: str):
         logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
         return error_response(message="Server error", status_code=500)
 
-#### TODO see for refresh of the refresh token and login authentication flow and add Auth0 to FE TODO ####
-
 
 @router.get("/auth/callback")
 async def google_callback(request:Request, response: Response, code: str):
@@ -170,6 +160,18 @@ async def logout(response: Response):
             if key.lower() == 'set-cookie':
                 json_response.headers[key] = value
         return json_response
+    except HTTPException as he:
+        return error_response(message=he.detail, status_code=he.status_code)
+    except Exception as e:
+        logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
+        return error_response(message="Server error", status_code=500)
+    
+    
+@router.get("/api/v1/check-user")    
+async def checkUserExist(userId: str,request: Request):
+    try:
+        user = await checkUserController(userId)
+        return success_response(message="user found",status_code=200,data=user)
     except HTTPException as he:
         return error_response(message=he.detail, status_code=he.status_code)
     except Exception as e:

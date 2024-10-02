@@ -66,6 +66,7 @@ async def refresh_token(email_acc: []):
             payload = {
                 'client_id': GOOGLE_CLIENT_ID,
                 'client_secret': GOOGLE_CLIENT_SECRET,
+                # 'refresh_token': "dssd",  # Ensure refresh_token is used
                 'refresh_token': email['refresh_token'],  # Ensure refresh_token is used
                 'grant_type': 'refresh_token'
             }
@@ -105,6 +106,7 @@ async def refresh_token(email_acc: []):
                 'client_id': MSFT_CLIENT_ID,
                 'client_secret': MSFT_CLIENT_SECRET,
                 'refresh_token': email['refresh_token'],
+                # 'refresh_token': "dsds",
                 'grant_type': 'refresh_token'
             }
             try:

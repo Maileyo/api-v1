@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 async def getCookiesController(request):
     session_id = get_session_cookie(request)
     if not session_id:
-        return  
+        return  handle_unauthenticated_error()
         
     user_id = verify_access_token(session_id)
     
@@ -126,7 +126,17 @@ async def signUpController(code: str, pdvr: str, request, response):
         # User exists, check if the provider is already in the account list
         for email_account in existing_user["email_account"]:
             if email_account["provider"] == pdvr:
-                return handle_custom_error(f"User already linked with {pdvr}", 409)
+                        email_account["auth"]["access_token"] = user_data['access_token']
+                        email_account["auth"]["refresh_token"] = user_data['refresh_token']
+                        email_account["auth"]["expiry"] = datetime.utcnow() + timedelta(seconds=user_data['expiry'])
+                        
+                        # Save the updated user document
+                        await users_collection.update_one(
+                            {"userId": existing_user["userId"]},
+                            {"$set": {"email_account": existing_user["email_account"]}}
+                        )
+                        return {"message": f"Tokens updated for provider {pdvr}"}
+
         
         expiration_time = datetime.utcnow() + timedelta(seconds=user_data['expiry'])
 
@@ -223,6 +233,19 @@ async def getUserController(request):
              return  handle_unauthenticated_error()
     
         user_id =  verify_access_token(session_id)
+        user = await users_collection.find_one({"userId": user_id})
+        if not user:
+            return handle_not_found_error("user not found")
+        print(user)
+        response_data = {
+            "userId": user['userId'],
+            "name": user['name'],
+            "avatar": user['avatar'],
+        }
+        return response_data
+    
+    
+async def checkUserController(user_id):
         user = await users_collection.find_one({"userId": user_id})
         if not user:
             return handle_not_found_error("user not found")

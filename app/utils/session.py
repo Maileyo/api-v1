@@ -7,10 +7,10 @@ def create_id():
 
 def set_session_cookie(response: Response, session_id: str):
     expires = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=20)
-    response.set_cookie(key="session_id", value=session_id, httponly=True, secure=False, expires=expires)
+    response.set_cookie(key="token_id", value=session_id, httponly=True, secure=False, expires=expires)
 
 def get_session_cookie(request: Request):
-    return request.cookies.get("session_id")
+    return request.cookies.get("token_id")
 
 def clear_session_cookie(response: Response):
-    response.delete_cookie("session_id")
+    response.delete_cookie("token_id")
