@@ -21,6 +21,7 @@ router = APIRouter()
 class SignUpRequest(BaseModel):
     userId: str
     name: str
+    avatar: str
 
 class SignInRequest(BaseModel):
     userId: str

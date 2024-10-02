@@ -125,6 +125,7 @@ async def signUpController(code: str, pdvr: str, request, response):
     if existing_user:
         # User exists, check if the provider is already in the account list
         for email_account in existing_user["email_account"]:
+            print(f"Checking provider: {email_account['provider']}")
             if email_account["provider"] == pdvr:
                         email_account["auth"]["access_token"] = user_data['access_token']
                         email_account["auth"]["refresh_token"] = user_data['refresh_token']
@@ -182,6 +183,7 @@ async def signUpController(code: str, pdvr: str, request, response):
 async def CreateAccountController(request_body,response):
     userId = request_body.userId
     name = request_body.name
+    avatar = request_body.avatar
     if not userId:
         return handle_validation_error("userId is required")
     if not name:
@@ -194,7 +196,7 @@ async def CreateAccountController(request_body,response):
     user = User(
         userId=userId,
         name=name,  
-        avatar="",  
+        avatar=avatar,  
         email_account=[
             EmailAccount(
                 email_id="",
@@ -254,6 +256,7 @@ async def checkUserController(user_id):
             "userId": user['userId'],
             "name": user['name'],
             "avatar": user['avatar'],
+            "email_account": user['email_account'][0]['email_id']
         }
         return response_data
 
