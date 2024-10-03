@@ -180,6 +180,7 @@ async def handle_msft_callback(ex_code:str):
         access_token = tokens.get('access_token')
         refresh_token = tokens.get('refresh_token')
         expires_in = tokens.get('expires_in')
+
         
         if not access_token:
             return handle_not_found_error("Access token not found")
@@ -216,7 +217,8 @@ async def handle_google_callback(code: str):
     credentials = flow.credentials
     access_token = credentials.token
     refresh_token = credentials.refresh_token
-    expiry = credentials.expiry.timestamp()
+    expiry = 3600  # Default expiry time in seconds
+
 
     service = build('oauth2', 'v2', credentials=credentials)
     

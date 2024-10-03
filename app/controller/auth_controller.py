@@ -31,6 +31,8 @@ async def getCookiesController(request):
         current_time = datetime.utcnow()
         
         # Check if the token is still valid
+        print("current_time",current_time)
+        print("expiry_value",expiry_value)
         if current_time > expiry_value:
             email_acc.append({
                 "userId": user_id,
@@ -103,7 +105,7 @@ async def signUpController(code: str, pdvr: str, request, response):
             user_data = await handle_google_callback(code)
         elif pdvr == "msft":
             user_data = await handle_msft_callback(code)
-            print(user_data)
+            # print(user_data)
         else:
             raise handle_custom_error(status_code=400, detail="Unsupported provider")
     except APIException as e:
@@ -140,6 +142,7 @@ async def signUpController(code: str, pdvr: str, request, response):
 
         
         expiration_time = datetime.utcnow() + timedelta(seconds=user_data['expiry'])
+        print("expiration : ",expiration_time, "user_data_expiry : ",user_data['expiry'])    
 
         # Append new email account details to existing user
         new_email_account = EmailAccount(
