@@ -1,22 +1,18 @@
 from fastapi import APIRouter, Request, Response, HTTPException
 from pydantic import BaseModel
-from app.controller.auth_controller import signInController,CreateAccountController , getCookiesController, signUpController , getUserController,checkUserController
+from app.controller.auth_controller import signInController, CreateAccountController, getCookiesController, signUpController, getUserController, checkUserController, get_access_token
 from app.utils.apiResponse import success_response, error_response
 from app.utils.error import handle_unauthenticated_error
-from app.utils.token import verify_access_token
+from app.utils.token import verify_jwt_token
 from app.utils.database import users_collection
 from app.model.user import User
-import logging
 from app.utils.session import clear_session_cookie
 from fastapi.responses import RedirectResponse
-from app.service.auth.auth_service import  generate_google_login_url,generate_msft_login_url
+from app.service.auth.auth_service import  refresh_token, generate_google_login_url, generate_msft_login_url
 from typing import List
-
-
+import logging
 
 router = APIRouter()
-
-
 
 class SignUpRequest(BaseModel):
     userId: str
@@ -46,6 +42,7 @@ async def cookies(request: Request):
 
 
 
+# @router.post("/api/v1/url-generate")
 @router.post("/api/v1/url-generate")
 async def urlGenerate(request_data: AuthProviderRequest, request: Request, response: Response):
     try:
@@ -68,6 +65,7 @@ async def urlGenerate(request_data: AuthProviderRequest, request: Request, respo
 
 
 
+# @router.post("/api/v1/create-account")
 @router.post("/api/v1/create-account")
 async def createAccount(sign_up_request: SignUpRequest, request: Request, response: Response):
     try:
@@ -86,6 +84,7 @@ async def createAccount(sign_up_request: SignUpRequest, request: Request, respon
     
     
     
+# @router.post("/api/v1/signIn")
 @router.post("/api/v1/signIn")
 async def signIn(sign_in_request: SignInRequest, request: Request, response: Response):
     try:
@@ -121,7 +120,7 @@ async def msft_callback(request:Request, response: Response, code: str):
         return error_response(message="Server error", status_code=500)
 
 
-@router.get("/auth/callback")
+@router.get("/auth/google/callback")
 async def google_callback(request:Request, response: Response, code: str):
     try:
         # print(user_data)
@@ -178,3 +177,4 @@ async def checkUserExist(userId: str,request: Request):
     except Exception as e:
         logging.error(f"Unexpected error in signIn: {str(e)}", exc_info=True)
         return error_response(message="Server error", status_code=500)
+    

@@ -1,13 +1,13 @@
 from app.utils.session import create_id, set_session_cookie, get_session_cookie, clear_session_cookie
-from app.utils.token import verify_access_token,create_access_token
+from app.utils.token import verify_jwt_token,create_jwt_token
 from app.utils.database import users_collection
-from app.utils.error import handle_unauthenticated_error,handle_custom_error,handle_validation_error,handle_server_error,handle_not_found_error
+from app.utils.error import handle_unauthenticated_error, handle_custom_error, handle_validation_error, handle_server_error, handle_not_found_error
 from app.model.user import User,EmailAccount,Auth
 from bson import ObjectId
 from app.utils.error import APIException
-import time 
-from app.service.auth.auth_service import refresh_token,handle_google_callback,handle_msft_callback
-from datetime import datetime, timedelta
+from app.service.auth.auth_service import refresh_token, handle_google_callback, handle_msft_callback
+from datetime import datetime, timedelta, timezone
+# from fastapi import HTTPException
 
 
 async def getCookiesController(request):
@@ -15,7 +15,7 @@ async def getCookiesController(request):
     if not session_id:
         return  handle_unauthenticated_error()
         
-    user_id = verify_access_token(session_id)
+    user_id = verify_jwt_token(session_id)
     
     user = await users_collection.find_one({"userId": user_id})
     if not user:
@@ -29,7 +29,6 @@ async def getCookiesController(request):
         expiry_value = email_account['auth']['expiry']
         provider = email_account['provider']
         current_time = datetime.utcnow()
-        
         # Check if the token is still valid
         print("current_time",current_time)
         print("expiry_value",expiry_value)
@@ -87,7 +86,7 @@ async def signInController(request_body, response):
     print("token_status",token_status)
     len(email_acc)      
    
-    jwt_access_token = create_access_token(data={"sub": user['userId']})
+    jwt_access_token = create_jwt_token(data={"sub": user['userId']})
     set_session_cookie(response, jwt_access_token)
     return {
         "userId": user['userId'],
@@ -115,7 +114,7 @@ async def signUpController(code: str, pdvr: str, request, response):
     session_id = get_session_cookie(request)
     if not session_id:
              return  
-    user_id =  verify_access_token(session_id)
+    user_id =  verify_jwt_token(session_id)
     print(user_id)
     # user = await users_collection.find_one({"userId": user_id})
     # if not user:
@@ -142,7 +141,7 @@ async def signUpController(code: str, pdvr: str, request, response):
 
         
         expiration_time = datetime.utcnow() + timedelta(seconds=user_data['expiry'])
-        print("expiration : ",expiration_time, "user_data_expiry : ",user_data['expiry'])    
+        print("expiration : ", expiration_time, "user_data_expiry : ", user_data['expiry'])    
 
         # Append new email account details to existing user
         new_email_account = EmailAccount(
@@ -166,7 +165,7 @@ async def signUpController(code: str, pdvr: str, request, response):
     # Then, add the new email account
         await users_collection.update_one(
             {"_id": existing_user["_id"]},
-            {"$push": {"email_account": new_email_account.dict()}}
+            {"$push": {"email_account": new_email_account.model_dump()}}
         )
 
         # Create a new JWT access token and set the session cookie
@@ -212,7 +211,7 @@ async def CreateAccountController(request_body,response):
             )
         ]
     )
-    user_data = user.dict()
+    user_data = user.model_dump()
     user_data['_id'] = ObjectId()
     try:
         await users_collection.insert_one(user_data)
@@ -220,7 +219,7 @@ async def CreateAccountController(request_body,response):
         return handle_server_error("failed to create user")
     
      # Create a JWT access token for the user
-    jwt_access_token = create_access_token(data={"sub": user_data['userId']})
+    jwt_access_token = create_jwt_token(data={"sub": user_data['userId']})
     
     # Set the session cookie with the JWT access token
     set_session_cookie(response, jwt_access_token)
@@ -233,34 +232,64 @@ async def CreateAccountController(request_body,response):
             
            
 async def getUserController(request):
-        session_id = get_session_cookie(request)
-        if not session_id:
-             return  handle_unauthenticated_error()
-    
-        user_id =  verify_access_token(session_id)
-        user = await users_collection.find_one({"userId": user_id})
-        if not user:
-            return handle_not_found_error("user not found")
-        print(user)
-        response_data = {
-            "userId": user['userId'],
-            "name": user['name'],
-            "avatar": user['avatar'],
-        }
-        return response_data
-    
+    session_id = get_session_cookie(request)
+    if not session_id:
+            return  handle_unauthenticated_error()
+
+    user_id =  verify_jwt_token(session_id)
+    user = await users_collection.find_one({"userId": user_id})
+    if not user:
+        return handle_not_found_error("user not found")
+    print(user)
+    response_data = {
+        "userId": user['userId'],
+        "name": user['name'],
+        "avatar": user['avatar'],
+    }
+    return response_data
+
     
 async def checkUserController(user_id):
-        user = await users_collection.find_one({"userId": user_id})
-        if not user:
-            return handle_not_found_error("user not found")
-        print(user)
-        response_data = {
-            "userId": user['userId'],
-            "name": user['name'],
-            "avatar": user['avatar'],
-            "email_account": user['email_account'][0]['email_id']
-        }
-        return response_data
+    user = await users_collection.find_one({"userId": user_id})
+    if not user:
+        return handle_not_found_error("user not found")
+    print(user)
+    response_data = {
+        "userId": user['userId'],
+        "name": user['name'],
+        "avatar": user['avatar'],
+        "email_account": user['email_account'][0]['email_id']
+    }
+    return response_data
+
+async def get_access_token(user_id: str, email_id: str):
+    # Fetch the user data from the database
+    user_data = await users_collection.find_one({"userId": user_id})
+
+    if not user_data:
+        return handle_not_found_error("Email account not found")
+
+    # Search for the email account within the user's email accounts
+    for email_account in user_data.get("email_account", []):
+        if email_account["email_id"] == email_id:
+            access_token = email_account["auth"]["access_token"]
+            expiry = email_account["auth"]["expiry"]
+            current_time = datetime.utcnow()
+            # print("expiry",expiry)
+            # print("current_time",current_time)
+            if current_time > expiry:
+                email_acc = [{
+                    "userId": user_id,
+                    "emailId": email_id,
+                    "provider": email_account['provider'],
+                    "refresh_token": email_account['auth']['refresh_token']
+                }]
+                updated_user = await refresh_token(email_acc)
+                access_token = updated_user[0]['new_access_token']
+            return access_token
+
+    # If the email account is not found, raise an exception
+    return handle_not_found_error("Email account not found")
+
 
 

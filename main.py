@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from app.router import auth_router
+from app.router import msft_router
+from app.router import gmail_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -19,6 +21,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router.router)
+app.include_router(msft_router.router)
+app.include_router(gmail_router.router)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from app.utils.error import handle_inv_token_error
 from app.config import SECRET_KEY, ALGORITHM
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_jwt_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     # if expires_delta:
     #     expire = datetime.utcnow() + expires_delta
@@ -16,7 +16,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def verify_access_token(token: str):
+def verify_jwt_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
