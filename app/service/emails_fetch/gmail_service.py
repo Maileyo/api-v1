@@ -1,6 +1,7 @@
+from app.controller.auth_controller import get_access_token
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from app.controller.auth_controller import get_access_token
+from fastapi import HTTPException
 
 async def get_gmail_service(user_id: str, email_id: str):
     """
@@ -99,3 +100,46 @@ async def fetch_emails(user_id: str, email_id: str, page_size: int, page_token: 
     except Exception as e:
         print(f"Error during email fetching process: {e}")
         raise Exception(f"Error fetching messages: {e}")
+    
+async def fetch_emails_from_contact(user_id: str, email_id: str, contact_id: str):
+    """
+    Fetch emails sent/received from/to a specific email address.
+    
+    Args:
+        user_id (str): Email address of the user.
+        email_id (str): Email address of the contact (sender/recipient).
+    
+    Returns:
+        dict: A list of emails and metadata.
+    """
+    service = await get_gmail_service(user_id, email_id)
+
+    query = f"from:{contact_id} OR to:{contact_id}"
+
+    try:
+        # Get the list of messages (filtered by the query)
+        response = service.users().messages().list(userId=email_id, q=query).execute()
+        messages = response.get('messages', [])
+        
+        if not messages:
+            return {"emails": []}
+
+        emails = []
+
+        def handle_message_request(request_id, response, exception):
+            """Callback function to handle each individual response in the batch."""
+            if exception:
+                print(f"Error fetching message {request_id}: {exception}")
+            else:
+                emails.append(clean_email_data(response))
+                print(f"Fetched message: {request_id}")
+
+        # Create and execute the batch request
+        create_batch_request(service, messages, handle_message_request)
+
+        # Return the cleaned emails
+        return {"emails": emails}
+
+    except Exception as e:
+        print(f"Error during email fetching process: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching messages: {e}")
