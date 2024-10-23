@@ -1,6 +1,5 @@
+from app.service.emails_fetch.gmail_service import fetch_emails, fetch_attachment, fetch_emails_from_contact
 from fastapi import APIRouter, Query
-from app.service.emails_fetch.gmail_service import fetch_emails, fetch_emails_from_contact
-
 router = APIRouter()
 
 @router.get("/api/v1/gmail/recent-emails")
@@ -18,3 +17,9 @@ async def fetch_emails_from(user_id: str = Query(...), email_id: str = Query(...
     """
     emails = await fetch_emails_from_contact(user_id, email_id, contact_id)
     return emails
+
+@router.get("/api/v1/gmail/get-attachment/")
+async def get_attachment(user_id: str = Query(...), email_id: str = Query(...), message_id: str = Query(...), attachment_id: str = Query(...), filename: str = Query(...), file_type: str = Query(...)):
+
+    attachment = await fetch_attachment(user_id, email_id, message_id, attachment_id, filename, file_type)
+    return attachment
